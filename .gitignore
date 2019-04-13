@@ -1,0 +1,8 @@
+# compiled files and executables
+**/target/
+
+# Remove all Cargo.locks
+**/Cargo.lock
+
+# backup files by rustfmt
+**/*.rs.bk
