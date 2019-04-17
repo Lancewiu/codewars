@@ -1,6 +1,7 @@
 //TODO custom testing with conditional jumps and loops
 //TODO custom edge case testing
-use std::cmp::Ordering;
+//TODO rewrite using iterator
+
 use std::default::Default;
 use std::{cmp, str, string};
 
@@ -18,7 +19,6 @@ enum Token {
     CondJmp,
     CondLoop,
 }
-
 #[derive(Debug)]
 struct ParseTokenErr(String);
 
@@ -37,6 +37,9 @@ impl Token {
     }
 }
 
+struct TokenIter {
+}
+
 #[derive(Debug)]
 enum Instruction {
     Move(Cardinal),
@@ -47,7 +50,7 @@ struct Interpreter {
     next: usize,
     life: usize,
     scope: Vec<usize>,
-    code: Vec<Token>,
+    code: &str,
 }
 
 impl Interpreter {
