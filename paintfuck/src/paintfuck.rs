@@ -1,9 +1,7 @@
-//TODO custom testing with conditional jumps and loops
 //TODO custom edge case testing
-//TODO rewrite using iterator
 
 use std::default::Default;
-use std::{cmp, str, string};
+use std::{cmp, fmt, str, string};
 
 #[derive(Debug, Clone, Copy)]
 enum Cardinal {
@@ -13,14 +11,20 @@ enum Cardinal {
     W,
 }
 
+struct ParseTokenErr(char);
+
+impl fmt::Display for ParseTokenErr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Invalid Character `{}`", self.0)
+    }
+}
+
 enum Token {
     Move(Cardinal),
     Flip,
     CondJmp,
     CondLoop,
 }
-#[derive(Debug)]
-struct ParseTokenErr(String);
 
 impl Token {
     fn try_from_char(c: char) -> Result<Self, ParseTokenErr> {
@@ -32,12 +36,9 @@ impl Token {
             '*' => Ok(Token::Flip),
             '[' => Ok(Token::CondJmp),
             ']' => Ok(Token::CondLoop),
-            _ => Err(ParseTokenErr(format!("Invalid token character `{}`", c))),
+            _ => Err(ParseTokenErr(c)),
         }
     }
-}
-
-struct TokenIter {
 }
 
 #[derive(Debug)]
@@ -50,57 +51,63 @@ struct Interpreter {
     next: usize,
     life: usize,
     scope: Vec<usize>,
-    code: &str,
+    code: Vec<Token>,
+    board: Board,
 }
 
 impl Interpreter {
-    fn parse_str(source: &str, life: usize) -> Result<Self, ParseTokenErr> {
-        Ok(Self {
+    fn new(code: Vec<Token>, board: Board, life: usize) -> Self {
+        Self {
             next: 0,
             life,
             scope: Vec::new(),
-            code: source
-                .chars()
-                .map(Token::try_from_char)
-                .collect::<Result<Vec<Token>, ParseTokenErr>>()?,
-        })
-    }
-
-    fn next_ins(&mut self, set: bool) -> Option<Instruction> {
-        self.life = self.life.checked_sub(1)?;
-
-        if let Some(tok) = self.code.get(self.next) {
-            self.next += 1;
-            match tok {
-                Token::Move(dir) => Some(Instruction::Move(*dir)),
-                Token::Flip => Some(Instruction::Flip),
-                Token::CondJmp => {
-                    if set {
-                        self.next += 1;
-                        self.scope.push(self.next);
-                    } else {
-                        self.next += self.jump().expect("Syntax Error!");
-                    }
-                    self.next_ins(set)
-                }
-                Token::CondLoop => {
-                    if set {
-                        self.next = *self.scope.last().expect("Syntax Error!");
-                    } else {
-                        self.next += 1;
-                        self.scope.pop();
-                    }
-                    self.next_ins(set)
-                }
-            }
-        } else {
-            None
+            code,
+            board,
         }
     }
 
-    fn jump(&self) -> Option<usize> {
+    fn run(mut self) -> Board {
+        let codelen = self.code.len();
+        while self.life > 0 && codelen > self.next {
+            self.next();
+        }
+        self.board
+    }
+
+    fn next(&mut self) {
+        match self.code[self.next] {
+            Token::Move(dir) => {
+                self.board.move_cursor(dir);
+                self.life -= 1;
+                self.next += 1;
+            }
+            Token::Flip => {
+                self.board.flip();
+                self.life -= 1;
+                self.next += 1;
+            }
+            Token::CondJmp => {
+                if self.board.is_cursor_set() {
+                    self.next += 1;
+                    self.scope.push(self.next);
+                } else {
+                    self.next += self.jump(self.next + 1).expect("Syntax Error!");
+                }
+            }
+            Token::CondLoop => {
+                if self.board.is_cursor_set() {
+                    self.next = *self.scope.last().expect("Syntax Error!");
+                } else {
+                    self.next += 1;
+                    self.scope.pop();
+                }
+            }
+        }
+    }
+
+    fn jump(&self, from: usize) -> Option<usize> {
         self.code
-            .get(self.next + 1..)?
+            .get(from..)?
             .iter()
             .scan(1, |scope, tok| {
                 match tok {
@@ -235,16 +242,13 @@ impl string::ToString for Board {
 pub fn interpreter(code: &str, iterations: usize, width: usize, height: usize) -> String {
     assert!(width > 0 && height > 0, "Invalid Board Dimensions!");
 
-    let mut instructions = Interpreter::parse_str(code, iterations).expect("Invalid Code");
-    let mut board = Board::new(width, height);
+    let code_tok = code
+        .chars()
+        .map(Token::try_from_char)
+        .collect::<Result<Vec<Token>, ParseTokenErr>>()
+        .unwrap_or_else(|e| panic!("{}", e));
 
-    loop {
-        let set = board.is_cursor_set();
-        let ins = instructions.next_ins(set);
-        match ins {
-            Some(Instruction::Move(dir)) => board.move_cursor(dir),
-            Some(Instruction::Flip) => board.flip(),
-            None => break board.to_string(),
-        }
-    }
+    Interpreter::new(code_tok, Board::new(width, height), iterations)
+        .run()
+        .to_string()
 }
