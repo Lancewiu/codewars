@@ -1,9 +1,7 @@
-//TODO custom edge case testing
-
 use std::default::Default;
-use std::{cmp, fmt, str, string};
+use std::{convert, hint, str, string};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Cardinal {
     N,
     S,
@@ -11,98 +9,82 @@ enum Cardinal {
     W,
 }
 
-struct ParseTokenErr(char);
-
-impl fmt::Display for ParseTokenErr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Invalid Character `{}`", self.0)
-    }
-}
-
+#[derive(Debug, PartialEq, Eq)]
 enum Token {
     Move(Cardinal),
     Flip,
     CondJmp,
     CondLoop,
+    Comment,
 }
 
-impl Token {
-    fn try_from_char(c: char) -> Result<Self, ParseTokenErr> {
+impl convert::From<char> for Token {
+    fn from(c: char) -> Self {
         match c {
-            'n' => Ok(Token::Move(Cardinal::N)),
-            'e' => Ok(Token::Move(Cardinal::E)),
-            's' => Ok(Token::Move(Cardinal::S)),
-            'w' => Ok(Token::Move(Cardinal::W)),
-            '*' => Ok(Token::Flip),
-            '[' => Ok(Token::CondJmp),
-            ']' => Ok(Token::CondLoop),
-            _ => Err(ParseTokenErr(c)),
+            'n' => Token::Move(Cardinal::N),
+            'e' => Token::Move(Cardinal::E),
+            's' => Token::Move(Cardinal::S),
+            'w' => Token::Move(Cardinal::W),
+            '*' => Token::Flip,
+            '[' => Token::CondJmp,
+            ']' => Token::CondLoop,
+            _ => Token::Comment,
         }
     }
 }
 
-#[derive(Debug)]
-enum Instruction {
-    Move(Cardinal),
-    Flip,
-}
-
 struct Interpreter {
     next: usize,
-    life: usize,
     scope: Vec<usize>,
     code: Vec<Token>,
     board: Board,
 }
 
 impl Interpreter {
-    fn new(code: Vec<Token>, board: Board, life: usize) -> Self {
+    fn new(code: Vec<Token>, board: Board) -> Self {
         Self {
             next: 0,
-            life,
             scope: Vec::new(),
             code,
             board,
         }
     }
 
-    fn run(mut self) -> Board {
+    fn run(mut self, life: usize) -> Board {
         let codelen = self.code.len();
-        while self.life > 0 && codelen > self.next {
-            self.next();
+        for _ in 0..life {
+            if self.next >= codelen {
+                break;
+            }
+            match self.code[self.next] {
+                Token::Move(dir) => {
+                    self.board.move_cursor(dir);
+                    self.next += 1;
+                }
+                Token::Flip => {
+                    self.board.flip();
+                    self.next += 1;
+                }
+                Token::CondJmp => {
+                    if self.board.is_cursor_set() {
+                        self.next += 1;
+                        self.scope.push(self.next);
+                    } else {
+                        self.next = self.jump(self.next + 1).expect("Syntax Error!");
+                    }
+                }
+                Token::CondLoop => {
+                    if self.board.is_cursor_set() {
+                        self.next = *self.scope.last().expect("Syntax Error!");
+                    } else {
+                        self.next += 1;
+                        self.scope.pop();
+                    }
+                }
+                Token::Comment => unsafe { hint::unreachable_unchecked() },
+            }
         }
         self.board
-    }
-
-    fn next(&mut self) {
-        match self.code[self.next] {
-            Token::Move(dir) => {
-                self.board.move_cursor(dir);
-                self.life -= 1;
-                self.next += 1;
-            }
-            Token::Flip => {
-                self.board.flip();
-                self.life -= 1;
-                self.next += 1;
-            }
-            Token::CondJmp => {
-                if self.board.is_cursor_set() {
-                    self.next += 1;
-                    self.scope.push(self.next);
-                } else {
-                    self.next += self.jump(self.next + 1).expect("Syntax Error!");
-                }
-            }
-            Token::CondLoop => {
-                if self.board.is_cursor_set() {
-                    self.next = *self.scope.last().expect("Syntax Error!");
-                } else {
-                    self.next += 1;
-                    self.scope.pop();
-                }
-            }
-        }
     }
 
     fn jump(&self, from: usize) -> Option<usize> {
@@ -118,7 +100,7 @@ impl Interpreter {
                 Some(*scope)
             })
             .position(|scope| scope == 0)
-            .map(|idx| idx + 1)
+            .map(|idx| idx + from + 1) //one after
     }
 }
 
@@ -129,15 +111,6 @@ impl Interpreter {
 struct Point {
     y: usize,
     x: usize,
-}
-
-impl Point {
-    fn dist_from(&self, other: &Point) -> Point {
-        Point {
-            x: cmp::max(self.x, other.x) - cmp::min(self.x, other.x),
-            y: cmp::max(self.y, other.y) - cmp::min(self.y, other.y),
-        }
-    }
 }
 
 struct Board {
@@ -158,45 +131,20 @@ impl Board {
     }
 
     fn move_cursor(&mut self, dir: Cardinal) {
-        self.cursor = self.move_pt(&self.cursor, dir);
-    }
-
-    fn move_pt(&self, pt: &Point, dir: Cardinal) -> Point {
-        let height_bound = self.height - 1;
-        let width_bound = self.width - 1;
-        let mut new_pt: Point = pt.clone();
         match dir {
             Cardinal::N => {
-                if pt.y == 0 {
-                    new_pt.y = height_bound;
-                } else {
-                    new_pt.y -= 1;
-                }
+                self.cursor.y = self.cursor.y.checked_sub(1).unwrap_or(self.height - 1);
             }
             Cardinal::S => {
-                if pt.y == height_bound {
-                    new_pt.y = 0;
-                } else {
-                    new_pt.y += 1;
-                }
+                self.cursor.y = (self.cursor.y + 1) % self.height;
             }
             Cardinal::E => {
-                if pt.x == width_bound {
-                    new_pt.x = 0;
-                } else {
-                    new_pt.x += 1;
-                }
+                self.cursor.x = (self.cursor.x + 1) % self.width;
             }
             Cardinal::W => {
-                if pt.x == 0 {
-                    new_pt.x = width_bound;
-                } else {
-                    new_pt.x -= 1;
-                }
+                self.cursor.x = self.cursor.x.checked_sub(1).unwrap_or(self.width - 1);
             }
         }
-
-        new_pt
     }
 
     fn flip(&mut self) {
@@ -216,39 +164,39 @@ impl Board {
 impl string::ToString for Board {
     fn to_string(&self) -> String {
         let mut flipped_points = self.flipped.iter().peekable();
-        (0..self.height)
-            .map(|y| {
-                (0..self.width)
-                    .map(|x| {
-                        let out = if let Some(pt) = flipped_points.peek() {
-                            Point { x, y } == **pt
-                        } else {
-                            false
-                        };
-                        if out {
-                            flipped_points.next();
-                            '1'
-                        } else {
-                            '0'
-                        }
-                    })
-                    .collect::<String>()
-            })
-            .collect::<Vec<String>>()
-            .join("\r\n")
+        let mut res = Vec::with_capacity(self.height);
+        for y in 0..self.height {
+            let mut row = String::with_capacity(self.width);
+            for x in 0..self.width {
+                let out = if let Some(pt) = flipped_points.peek() {
+                    Point { x, y } == **pt
+                } else {
+                    false
+                };
+                row.push(if out {
+                    flipped_points.next();
+                    '1'
+                } else {
+                    '0'
+                });
+            }
+            res.push(row);
+        }
+        res.join("\r\n")
     }
 }
 
+#[allow(dead_code)]
 pub fn interpreter(code: &str, iterations: usize, width: usize, height: usize) -> String {
     assert!(width > 0 && height > 0, "Invalid Board Dimensions!");
 
     let code_tok = code
         .chars()
-        .map(Token::try_from_char)
-        .collect::<Result<Vec<Token>, ParseTokenErr>>()
-        .unwrap_or_else(|e| panic!("{}", e));
+        .map(Token::from)
+        .filter(|t| *t != Token::Comment)
+        .collect();
 
-    Interpreter::new(code_tok, Board::new(width, height), iterations)
-        .run()
+    Interpreter::new(code_tok, Board::new(width, height))
+        .run(iterations)
         .to_string()
 }
