@@ -6,3 +6,5 @@
 
 # backup files by rustfmt
 **/*.rs.bk
+
+**/*.swp
