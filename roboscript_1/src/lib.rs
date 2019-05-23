@@ -2,6 +2,7 @@ mod roboscript;
 
 #[cfg(test)]
 mod tests {
+    use crate::roboscript::highlight;
     #[cfg(test)]
     macro_rules! assert_highlight {
         ($code:expr , $expected:expr $(,)*) => {{

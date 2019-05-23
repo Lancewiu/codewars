@@ -1,72 +1,47 @@
-use std::string::ToString;
-use std::fmt::{self, Display};
+use std::fmt::{self, Write};
 
-enum Color {
-    Pink,
-    Red,
-    Green,
-    Orange,
-}
-
-impl Display for Color {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use Color::*;
-        write!(f, "{}", match self {
-            Pink => "pink",
-            Red => "red",
-            Green => "green",
-            Orange => "orange",
-        })
-    }
-}
-
-enum Prepend {
-    Full(Color),
-    StartOnly(Color),
-    None,
-}
-
-impl ToString for Prepend {
-    fn to_string(&self) -> String {
-        use Prepend::*;
-        match self {
-            Full(col) => format!("</span><span style=\"color: {}\">", col),
-            StartOnly(col) => format!("<span style=\"color: {}\">", col),
-            None => String::new(),
+fn write_open_tag(f: &mut String, c: char) -> fmt::Result {
+    let color = match c {
+        'F' => "pink",
+        'L' => "red",
+        'R' => "green",
+        _ if c.is_ascii_digit() => "orange",
+        _ => {
+            return Ok(());
         }
+    };
+    write!(f, "<span style=\"color: {}\">", color)
+}
+
+fn write_close_tag(f: &mut String, prev: char) -> fmt::Result {
+    match prev {
+        'F' | 'L' | 'R' => write!(f, "</span>"),
+        _ if prev.is_ascii_digit() => write!(f, "</span>"),
+        _ => Ok(()),
     }
 }
 
+#[allow(dead_code)]
 pub fn highlight(code: &str) -> String {
-  // Implement your syntax highlighter here
-  let code_len = code.len();
-  let mut code_iter = code.chars().peekable();
+    let mut res = String::with_capacity(code.len());
+    let mut prev_opt: Option<char> = None;
 
-  code.chars()
-      .scan(None, |mut prev, c| {
-          match c {
-              'F' => match prev {
-                  Some('F') => format!(""),
-                  None =>
-                  _ =>
-              },
-              'L' => match prev {
-                  Some('L') =>,
-                  None =>,
-                  _ =>
-              },
-              'R' => match prev {
-                  Some('R') =>,
-              },
-              digit if digit.is_ascii_digit() => match prev {
-                  Some(d) if d.is_ascii_digit() =>,
-              },
-              '(' | ')' => match prev {
-                  Some('(') | Some(')') => Prepend::None
-              },
-              _ => unreachable!(),
-          }
-          prev = Some(c);
-      })
-      .join()
+    for c in code.chars() {
+        if let Some(prev) = prev_opt {
+            if prev == c || (c.is_ascii_digit() && prev.is_ascii_digit()) {
+                Ok(())
+            } else {
+                write_close_tag(&mut res, prev).and(write_open_tag(&mut res, c))
+            }
+        } else {
+            write_open_tag(&mut res, c)
+        }
+        .expect("Write tags failed");
+        write!(res, "{}", c).expect("Write character failed");
+        prev_opt = Some(c);
+    }
+    if let Some(prev) = prev_opt {
+        write_close_tag(&mut res, prev).expect("Write end tag failed");
+    }
+    res
 }
