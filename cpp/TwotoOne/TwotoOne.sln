@@ -5,7 +5,7 @@ VisualStudioVersion = 16.0.28917.181
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TwotoOne", "TwotoOne.vcxproj", "{2CD341EE-D7FA-45D2-895C-F7D266CDF039}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TwoToOneUnitTests", "..\TwoToOneUnitTests\TwoToOneUnitTests.vcxproj", "{3A33506E-801D-435B-ACBF-DFCF9BB006E1}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TwoToOneUnitTests", "TwoToOneUnitTests\TwoToOneUnitTests.vcxproj", "{3A33506E-801D-435B-ACBF-DFCF9BB006E1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

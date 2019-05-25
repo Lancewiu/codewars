@@ -1,4 +1,4 @@
-#include "..\Header\TwoToOne.h"
+#include "TwoToOne.h"
 #include <iterator>
 #include <set>
 
