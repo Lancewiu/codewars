@@ -1,5 +1,5 @@
 [package]
-name = "integers_rec1_sumOfSquaredDivisors"
+name = "int_rec1_sum_of_square_divisors"
 version = "0.1.0"
 authors = ["Lawrence Niu <ranchwiu@gmail.com>"]
 edition = "2018"
